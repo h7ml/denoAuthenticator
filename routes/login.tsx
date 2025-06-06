@@ -16,28 +16,28 @@ export const handler: Handlers<LoginData> = {
         headers: { "Location": "/dashboard" },
       });
     }
-    
+
     return ctx.render({});
   },
-  
+
   async POST(req, ctx) {
     const form = await req.formData();
     const username = form.get("username")?.toString() || "";
     const password = form.get("password")?.toString() || "";
-    
+
     if (!username || !password) {
       return ctx.render({
         error: "请填写用户名和密码",
       });
     }
-    
+
     const result = await loginUser(username, password);
-    
+
     if (result.success && result.sessionId) {
       const headers = new Headers();
       headers.set("Location", "/dashboard");
       headers.set("Set-Cookie", createSessionCookie(result.sessionId));
-      
+
       return new Response(null, {
         status: 302,
         headers,
@@ -79,7 +79,7 @@ export default function Login({ data }: PageProps<LoginData>) {
               <span class="block sm:inline">{data.error}</span>
             </div>
           )}
-          
+
           {data.success && (
             <div class="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded relative">
               <span class="block sm:inline">{data.success}</span>
@@ -141,7 +141,13 @@ export default function Login({ data }: PageProps<LoginData>) {
               </div>
             </div>
 
-            <div class="mt-6">
+            <div class="mt-6 grid grid-cols-2 gap-3">
+              <a
+                href="/reset-password"
+                class="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                重置密码
+              </a>
               <a
                 href="/"
                 class="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"

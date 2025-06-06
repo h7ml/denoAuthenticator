@@ -1,13 +1,15 @@
 /**
  * 数据库操作模块
- * 使用内存存储用户数据和认证器条目（生产环境应使用真实数据库）
+ * 使用 JSON 文件存储用户数据和认证器条目（持久化内存存储）
  */
 
 export interface User {
   id: string;
   username: string;
+  email: string;
   password_hash: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface AuthenticatorEntry {
@@ -23,32 +25,108 @@ export interface AuthenticatorEntry {
   updated_at: string;
 }
 
-// 内存存储
-const users = new Map<string, User>();
-const usersByUsername = new Map<string, string>();
-const authenticatorEntries = new Map<string, AuthenticatorEntry>();
-const userEntries = new Map<string, Map<string, AuthenticatorEntry>>();
+// 数据存储
+interface DatabaseData {
+  users: Map<string, User>;
+  usersByUsername: Map<string, string>;
+  usersByEmail: Map<string, string>;
+  authenticatorEntries: Map<string, AuthenticatorEntry>;
+  userEntries: Map<string, Map<string, AuthenticatorEntry>>;
+}
+
+// 内存数据
+let data: DatabaseData = {
+  users: new Map(),
+  usersByUsername: new Map(),
+  usersByEmail: new Map(),
+  authenticatorEntries: new Map(),
+  userEntries: new Map(),
+};
+
+const DB_FILE = "./db/data.json";
+
+/**
+ * 从文件加载数据
+ */
+function loadData(): void {
+  try {
+    const fileContent = Deno.readTextFileSync(DB_FILE);
+    const jsonData = JSON.parse(fileContent);
+
+    // 重建 Map 结构
+    data.users = new Map(jsonData.users || []);
+    data.usersByUsername = new Map(jsonData.usersByUsername || []);
+    data.usersByEmail = new Map(jsonData.usersByEmail || []);
+    data.authenticatorEntries = new Map(jsonData.authenticatorEntries || []);
+
+    // 重建嵌套 Map 结构
+    data.userEntries = new Map();
+    if (jsonData.userEntries) {
+      for (const [userId, entries] of jsonData.userEntries) {
+        data.userEntries.set(userId, new Map(entries));
+      }
+    }
+
+    console.log("✅ 数据从文件加载完成");
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      console.log("📁 数据文件不存在，将创建新文件");
+    } else {
+      console.error("❌ 加载数据失败:", error);
+    }
+  }
+}
+
+/**
+ * 保存数据到文件
+ */
+function saveData(): void {
+  try {
+    // 确保目录存在
+    try {
+      Deno.mkdirSync("./db", { recursive: true });
+    } catch {
+      // 目录已存在
+    }
+
+    // 转换 Map 为数组以便 JSON 序列化
+    const jsonData = {
+      users: Array.from(data.users.entries()),
+      usersByUsername: Array.from(data.usersByUsername.entries()),
+      usersByEmail: Array.from(data.usersByEmail.entries()),
+      authenticatorEntries: Array.from(data.authenticatorEntries.entries()),
+      userEntries: Array.from(data.userEntries.entries()).map(([userId, entries]) => [
+        userId,
+        Array.from(entries.entries())
+      ]),
+    };
+
+    Deno.writeTextFileSync(DB_FILE, JSON.stringify(jsonData, null, 2));
+  } catch (error) {
+    console.error("❌ 保存数据失败:", error);
+  }
+}
 
 /**
  * 初始化数据库连接
  */
-export async function initDatabase(): Promise<void> {
-  // 内存数据库不需要初始化
-  console.log("✅ 内存数据库初始化完成");
+export function initDatabase(): void {
+  loadData();
+  console.log("✅ JSON 数据库初始化完成");
 }
 
 /**
  * 获取数据库实例
  */
-export async function getDatabase(): Promise<void> {
-  // 内存数据库不需要实例
+export function getDatabase(): DatabaseData {
+  return data;
 }
 
 /**
  * 关闭数据库连接
  */
 export function closeDatabase(): void {
-  // 内存数据库不需要关闭
+  saveData();
 }
 
 /**
@@ -63,23 +141,31 @@ function generateId(): string {
  */
 export class UserService {
   constructor() {
-    // 内存存储不需要初始化
+    // JSON 存储不需要初始化
   }
 
   /**
    * 创建用户
    */
-  async createUser(username: string, passwordHash: string): Promise<string> {
+  createUser(username: string, email: string, passwordHash: string): string {
     const id = generateId();
+    const now = new Date().toISOString();
+
     const user: User = {
       id,
       username,
+      email,
       password_hash: passwordHash,
-      created_at: new Date().toISOString(),
+      created_at: now,
+      updated_at: now,
     };
 
-    users.set(id, user);
-    usersByUsername.set(username, id);
+    data.users.set(id, user);
+    data.usersByUsername.set(username, id);
+    data.usersByEmail.set(email, id);
+
+    // 保存到文件
+    saveData();
 
     return id;
   }
@@ -87,29 +173,80 @@ export class UserService {
   /**
    * 根据用户名获取用户
    */
-  async getUserByUsername(username: string): Promise<User | null> {
-    // 先通过用户名获取用户 ID
-    const userId = usersByUsername.get(username);
+  getUserByUsername(username: string): User | null {
+    const userId = data.usersByUsername.get(username);
     if (!userId) {
       return null;
     }
+    return data.users.get(userId) || null;
+  }
 
-    // 再通过 ID 获取用户信息
-    return users.get(userId) || null;
+  /**
+   * 根据邮箱获取用户
+   */
+  getUserByEmail(email: string): User | null {
+    const userId = data.usersByEmail.get(email);
+    if (!userId) {
+      return null;
+    }
+    return data.users.get(userId) || null;
+  }
+
+  /**
+   * 根据用户名和邮箱获取用户
+   */
+  getUserByUsernameAndEmail(username: string, email: string): User | null {
+    const user = this.getUserByUsername(username);
+    if (user && user.email === email) {
+      return user;
+    }
+    return null;
   }
 
   /**
    * 根据 ID 获取用户
    */
-  async getUserById(id: string): Promise<User | null> {
-    return users.get(id) || null;
+  getUserById(id: string): User | null {
+    return data.users.get(id) || null;
   }
 
   /**
    * 检查用户名是否存在
    */
-  async usernameExists(username: string): Promise<boolean> {
-    return usersByUsername.has(username);
+  usernameExists(username: string): boolean {
+    return data.usersByUsername.has(username);
+  }
+
+  /**
+   * 检查邮箱是否存在
+   */
+  emailExists(email: string): boolean {
+    return data.usersByEmail.has(email);
+  }
+
+  /**
+   * 检查用户名和邮箱组合是否存在
+   */
+  usernameEmailExists(username: string, email: string): boolean {
+    return this.usernameExists(username) || this.emailExists(email);
+  }
+
+  /**
+   * 更新用户密码
+   */
+  updatePassword(username: string, email: string, newPasswordHash: string): boolean {
+    const user = this.getUserByUsernameAndEmail(username, email);
+    if (!user) {
+      return false;
+    }
+
+    user.password_hash = newPasswordHash;
+    user.updated_at = new Date().toISOString();
+
+    data.users.set(user.id, user);
+    saveData();
+
+    return true;
   }
 }
 
@@ -118,13 +255,13 @@ export class UserService {
  */
 export class AuthenticatorService {
   constructor() {
-    // 内存存储不需要初始化
+    // JSON 存储不需要初始化
   }
 
   /**
    * 创建认证器条目
    */
-  async createEntry(
+  createEntry(
     userId: string,
     name: string,
     secret: string,
@@ -132,7 +269,7 @@ export class AuthenticatorService {
     accountName: string = "",
     digits: number = 6,
     timeStep: number = 30
-  ): Promise<string> {
+  ): string {
     const id = generateId();
     const now = new Date().toISOString();
 
@@ -149,12 +286,14 @@ export class AuthenticatorService {
       updated_at: now,
     };
 
-    authenticatorEntries.set(id, entry);
+    data.authenticatorEntries.set(id, entry);
 
-    if (!userEntries.has(userId)) {
-      userEntries.set(userId, new Map());
+    if (!data.userEntries.has(userId)) {
+      data.userEntries.set(userId, new Map());
     }
-    userEntries.get(userId)!.set(id, entry);
+    data.userEntries.get(userId)!.set(id, entry);
+
+    saveData();
 
     return id;
   }
@@ -162,8 +301,8 @@ export class AuthenticatorService {
   /**
    * 获取用户的所有认证器条目
    */
-  async getUserEntries(userId: string): Promise<AuthenticatorEntry[]> {
-    const userEntriesMap = userEntries.get(userId);
+  getUserEntries(userId: string): AuthenticatorEntry[] {
+    const userEntriesMap = data.userEntries.get(userId);
     if (!userEntriesMap) {
       return [];
     }
@@ -177,8 +316,8 @@ export class AuthenticatorService {
   /**
    * 根据 ID 获取认证器条目
    */
-  async getEntryById(id: string, userId: string): Promise<AuthenticatorEntry | null> {
-    const userEntriesMap = userEntries.get(userId);
+  getEntryById(id: string, userId: string): AuthenticatorEntry | null {
+    const userEntriesMap = data.userEntries.get(userId);
     if (!userEntriesMap) {
       return null;
     }
@@ -188,14 +327,14 @@ export class AuthenticatorService {
   /**
    * 更新认证器条目
    */
-  async updateEntry(
+  updateEntry(
     id: string,
     userId: string,
     name: string,
     issuer: string = "",
     accountName: string = ""
-  ): Promise<boolean> {
-    const existing = await this.getEntryById(id, userId);
+  ): boolean {
+    const existing = this.getEntryById(id, userId);
 
     if (!existing) {
       return false;
@@ -209,8 +348,10 @@ export class AuthenticatorService {
       updated_at: new Date().toISOString(),
     };
 
-    authenticatorEntries.set(id, updated);
-    userEntries.get(userId)!.set(id, updated);
+    data.authenticatorEntries.set(id, updated);
+    data.userEntries.get(userId)!.set(id, updated);
+
+    saveData();
 
     return true;
   }
@@ -218,18 +359,20 @@ export class AuthenticatorService {
   /**
    * 删除认证器条目
    */
-  async deleteEntry(id: string, userId: string): Promise<boolean> {
-    const existing = await this.getEntryById(id, userId);
+  deleteEntry(id: string, userId: string): boolean {
+    const existing = this.getEntryById(id, userId);
 
     if (!existing) {
       return false;
     }
 
-    authenticatorEntries.delete(id);
-    const userEntriesMap = userEntries.get(userId);
+    data.authenticatorEntries.delete(id);
+    const userEntriesMap = data.userEntries.get(userId);
     if (userEntriesMap) {
       userEntriesMap.delete(id);
     }
+
+    saveData();
 
     return true;
   }

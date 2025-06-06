@@ -5,6 +5,14 @@
 import { UserService } from "./db.ts";
 
 /**
+ * 验证邮箱格式
+ */
+export function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+/**
  * 会话管理
  */
 export interface Session {
@@ -178,18 +186,34 @@ export function cleanupExpiredSessions(): void {
 /**
  * 用户注册
  */
-export async function registerUser(username: string, password: string): Promise<{
+export async function registerUser(username: string, email: string, password: string): Promise<{
   success: boolean;
   message: string;
   userId?: string;
 }> {
   const userService = new UserService();
 
+  // 验证邮箱格式
+  if (!isValidEmail(email)) {
+    return {
+      success: false,
+      message: "邮箱格式不正确",
+    };
+  }
+
   // 检查用户名是否已存在
-  if (await userService.usernameExists(username)) {
+  if (userService.usernameExists(username)) {
     return {
       success: false,
       message: "用户名已存在",
+    };
+  }
+
+  // 检查邮箱是否已存在
+  if (userService.emailExists(email)) {
+    return {
+      success: false,
+      message: "邮箱已被使用",
     };
   }
 
@@ -206,7 +230,7 @@ export async function registerUser(username: string, password: string): Promise<
     const passwordHash = await hashPassword(password);
 
     // 创建用户
-    const userId = await userService.createUser(username, passwordHash);
+    const userId = userService.createUser(username, email, passwordHash);
 
     return {
       success: true,
@@ -234,7 +258,7 @@ export async function loginUser(username: string, password: string): Promise<{
 
   try {
     // 获取用户
-    const user = await userService.getUserByUsername(username);
+    const user = userService.getUserByUsername(username);
     if (!user) {
       return {
         success: false,
@@ -267,6 +291,65 @@ export async function loginUser(username: string, password: string): Promise<{
     return {
       success: false,
       message: "登录失败：" + (error as Error).message,
+    };
+  }
+}
+
+/**
+ * 重置密码
+ */
+export async function resetPassword(username: string, email: string, newPassword: string): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  const userService = new UserService();
+
+  // 验证邮箱格式
+  if (!isValidEmail(email)) {
+    return {
+      success: false,
+      message: "邮箱格式不正确",
+    };
+  }
+
+  // 验证新密码强度
+  if (newPassword.length < 6) {
+    return {
+      success: false,
+      message: "密码长度至少为6位",
+    };
+  }
+
+  try {
+    // 验证用户名和邮箱是否匹配
+    const user = userService.getUserByUsernameAndEmail(username, email);
+    if (!user) {
+      return {
+        success: false,
+        message: "用户名和邮箱不匹配",
+      };
+    }
+
+    // 哈希新密码
+    const newPasswordHash = await hashPassword(newPassword);
+
+    // 更新密码
+    const updated = userService.updatePassword(username, email, newPasswordHash);
+    if (!updated) {
+      return {
+        success: false,
+        message: "密码更新失败",
+      };
+    }
+
+    return {
+      success: true,
+      message: "密码重置成功",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: "重置失败：" + (error as Error).message,
     };
   }
 }

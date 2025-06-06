@@ -12,6 +12,6 @@ import config from "./fresh.config.ts";
 import { initApp } from "./lib/init.ts";
 
 // 初始化应用
-await initApp();
+initApp();
 
 await start(manifest, config);

@@ -14,6 +14,7 @@ import * as $index from "./routes/index.tsx";
 import * as $login from "./routes/login.tsx";
 import * as $logout from "./routes/logout.tsx";
 import * as $register from "./routes/register.tsx";
+import * as $reset_password from "./routes/reset-password.tsx";
 import * as $AuthenticatorList from "./islands/AuthenticatorList.tsx";
 import * as $Counter from "./islands/Counter.tsx";
 import * as $QRCodeUploader from "./islands/QRCodeUploader.tsx";
@@ -33,6 +34,7 @@ const manifest = {
     "./routes/login.tsx": $login,
     "./routes/logout.tsx": $logout,
     "./routes/register.tsx": $register,
+    "./routes/reset-password.tsx": $reset_password,
   },
   islands: {
     "./islands/AuthenticatorList.tsx": $AuthenticatorList,

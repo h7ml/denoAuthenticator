@@ -1,12 +1,12 @@
 import { Handlers, PageProps } from "$fresh/server.ts";
-import { registerUser, getSessionFromRequest, loginUser, createSessionCookie } from "../lib/auth.ts";
+import { resetPassword, getSessionFromRequest } from "../lib/auth.ts";
 
-interface RegisterData {
+interface ResetPasswordData {
   error?: string;
   success?: string;
 }
 
-export const handler: Handlers<RegisterData> = {
+export const handler: Handlers<ResetPasswordData> = {
   GET(req, ctx) {
     // 检查用户是否已登录
     const session = getSessionFromRequest(req);
@@ -22,42 +22,29 @@ export const handler: Handlers<RegisterData> = {
 
   async POST(req, ctx) {
     const form = await req.formData();
-    const username = form.get("username")?.toString();
+    const username = form.get("username")?.toString() || "";
     const email = form.get("email")?.toString() || "";
-    const password = form.get("password")?.toString() || "";
+    const newPassword = form.get("newPassword")?.toString() || "";
     const confirmPassword = form.get("confirmPassword")?.toString() || "";
 
-    if (!username || !email || !password || !confirmPassword) {
+    if (!username || !email || !newPassword || !confirmPassword) {
       return ctx.render({
         error: "请填写所有字段",
       });
     }
 
-    if (password !== confirmPassword) {
+    if (newPassword !== confirmPassword) {
       return ctx.render({
         error: "两次输入的密码不一致",
       });
     }
 
-    const result = await registerUser(username, email, password);
+    const result = await resetPassword(username, email, newPassword);
 
     if (result.success) {
-      // 注册成功后自动登录
-      const loginResult = await loginUser(username, password);
-      if (loginResult.success && loginResult.sessionId) {
-        // 设置会话 cookie 并重定向到仪表板
-        return new Response(null, {
-          status: 302,
-          headers: {
-            "Location": "/dashboard",
-            "Set-Cookie": createSessionCookie(loginResult.sessionId),
-          },
-        });
-      } else {
-        return ctx.render({
-          success: "注册成功！请前往登录页面登录。",
-        });
-      }
+      return ctx.render({
+        success: "密码重置成功！请使用新密码登录。",
+      });
     } else {
       return ctx.render({
         error: result.message,
@@ -66,25 +53,22 @@ export const handler: Handlers<RegisterData> = {
   },
 };
 
-export default function Register({ data }: PageProps<RegisterData>) {
+export default function ResetPassword({ data }: PageProps<ResetPasswordData>) {
   return (
     <div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div class="sm:mx-auto sm:w-full sm:max-w-md">
         <div class="flex justify-center">
-          <div class="w-16 h-16 bg-blue-600 rounded-lg flex items-center justify-center">
+          <div class="w-16 h-16 bg-red-600 rounded-lg flex items-center justify-center">
             <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-3a1 1 0 011-1h2.586l6.414-6.414a6 6 0 015.743-7.743z"></path>
             </svg>
           </div>
         </div>
         <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          创建新账户
+          重置密码
         </h2>
         <p class="mt-2 text-center text-sm text-gray-600">
-          或者{" "}
-          <a href="/login" class="font-medium text-blue-600 hover:text-blue-500">
-            登录现有账户
-          </a>
+          请输入您的用户名和邮箱地址来重置密码
         </p>
       </div>
 
@@ -119,13 +103,10 @@ export default function Register({ data }: PageProps<RegisterData>) {
                   type="text"
                   autoComplete="username"
                   required
-                  class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
                   placeholder="请输入用户名"
                 />
               </div>
-              <p class="mt-1 text-xs text-gray-500">
-                用户名将用于登录系统
-              </p>
             </div>
 
             <div>
@@ -139,28 +120,28 @@ export default function Register({ data }: PageProps<RegisterData>) {
                   type="email"
                   autoComplete="email"
                   required
-                  class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="请输入邮箱地址"
+                  class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                  placeholder="请输入注册时的邮箱地址"
                 />
               </div>
               <p class="mt-1 text-xs text-gray-500">
-                邮箱用于密码重置和账户验证
+                必须与注册时使用的邮箱地址一致
               </p>
             </div>
 
             <div>
-              <label htmlFor="password" class="block text-sm font-medium text-gray-700">
-                密码
+              <label htmlFor="newPassword" class="block text-sm font-medium text-gray-700">
+                新密码
               </label>
               <div class="mt-1">
                 <input
-                  id="password"
-                  name="password"
+                  id="newPassword"
+                  name="newPassword"
                   type="password"
                   autoComplete="new-password"
                   required
-                  class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="请输入密码"
+                  class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                  placeholder="请输入新密码"
                 />
               </div>
               <p class="mt-1 text-xs text-gray-500">
@@ -170,7 +151,7 @@ export default function Register({ data }: PageProps<RegisterData>) {
 
             <div>
               <label htmlFor="confirmPassword" class="block text-sm font-medium text-gray-700">
-                确认密码
+                确认新密码
               </label>
               <div class="mt-1">
                 <input
@@ -179,8 +160,8 @@ export default function Register({ data }: PageProps<RegisterData>) {
                   type="password"
                   autoComplete="new-password"
                   required
-                  class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="请再次输入密码"
+                  class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                  placeholder="请再次输入新密码"
                 />
               </div>
             </div>
@@ -188,9 +169,9 @@ export default function Register({ data }: PageProps<RegisterData>) {
             <div>
               <button
                 type="submit"
-                class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               >
-                创建账户
+                重置密码
               </button>
             </div>
           </form>
@@ -205,12 +186,18 @@ export default function Register({ data }: PageProps<RegisterData>) {
               </div>
             </div>
 
-            <div class="mt-6">
+            <div class="mt-6 grid grid-cols-2 gap-3">
               <a
-                href="/"
+                href="/login"
                 class="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                返回首页
+                返回登录
+              </a>
+              <a
+                href="/register"
+                class="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                注册账户
               </a>
             </div>
           </div>
