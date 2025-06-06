@@ -143,28 +143,72 @@ export async function verifyTOTP(
 }
 
 /**
- * 解析 Microsoft Authenticator URL
+ * 解析 phonefactor:// URL (Microsoft Authenticator 格式)
  */
-export function parseMicrosoftAuthURL(url: string): {
+export function parsePhoneFactorURL(url: string): {
   secret: string;
   issuer: string;
   accountName: string;
 } | null {
   try {
     const urlObj = new URL(url);
-    
-    if (urlObj.protocol !== "otpauth:") {
+
+    if (urlObj.protocol !== "phonefactor:") {
       return null;
     }
-    
-    const secret = urlObj.searchParams.get("secret");
-    const issuer = urlObj.searchParams.get("issuer") || urlObj.pathname.split("/")[1] || "";
-    const accountName = decodeURIComponent(urlObj.pathname.split("/")[2] || "");
-    
+
+    // phonefactor://activate_account?code=518227904&url=https%3a%2f%2fmobileappcommunicator.auth.microsoft.com%2factivatev2%2f863602595%2fSASPUBKRCAZ1FD043
+    const code = urlObj.searchParams.get("code");
+    const activateUrl = urlObj.searchParams.get("url");
+
+    if (!code || !activateUrl) {
+      return null;
+    }
+
+    // 解码激活 URL
+    const decodedUrl = decodeURIComponent(activateUrl);
+
+    // 从激活 URL 中提取密钥（通常在路径的最后部分）
+    const urlParts = decodedUrl.split("/");
+    const secret = urlParts[urlParts.length - 1];
+
     if (!secret) {
       return null;
     }
-    
+
+    return {
+      secret: secret,
+      issuer: "Microsoft",
+      accountName: `Microsoft Account (${code})`,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 解析标准 otpauth:// URL
+ */
+export function parseOtpAuthURL(url: string): {
+  secret: string;
+  issuer: string;
+  accountName: string;
+} | null {
+  try {
+    const urlObj = new URL(url);
+
+    if (urlObj.protocol !== "otpauth:") {
+      return null;
+    }
+
+    const secret = urlObj.searchParams.get("secret");
+    const issuer = urlObj.searchParams.get("issuer") || urlObj.pathname.split("/")[1] || "";
+    const accountName = decodeURIComponent(urlObj.pathname.split("/")[2] || "");
+
+    if (!secret) {
+      return null;
+    }
+
     return {
       secret,
       issuer,
@@ -173,6 +217,41 @@ export function parseMicrosoftAuthURL(url: string): {
   } catch {
     return null;
   }
+}
+
+/**
+ * 通用认证器 URL 解析器
+ */
+export function parseAuthenticatorURL(url: string): {
+  secret: string;
+  issuer: string;
+  accountName: string;
+} | null {
+  // 尝试解析不同格式的 URL
+  const parsers = [
+    parseOtpAuthURL,
+    parsePhoneFactorURL,
+  ];
+
+  for (const parser of parsers) {
+    const result = parser(url);
+    if (result) {
+      return result;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 解析 Microsoft Authenticator URL (保持向后兼容)
+ */
+export function parseMicrosoftAuthURL(url: string): {
+  secret: string;
+  issuer: string;
+  accountName: string;
+} | null {
+  return parseAuthenticatorURL(url);
 }
 
 /**

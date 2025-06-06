@@ -1,7 +1,8 @@
 import { Handlers, PageProps } from "$fresh/server.ts";
-import { getSessionFromRequest, requireAuth } from "../lib/auth.ts";
+import { requireAuth } from "../lib/auth.ts";
 import { AuthenticatorService } from "../lib/db.ts";
-import { parseMicrosoftAuthURL, generateTOTP } from "../lib/totp.ts";
+import { parseAuthenticatorURL, generateTOTP } from "../lib/totp.ts";
+import QRCodeUploader from "../islands/QRCodeUploader.tsx";
 
 interface AddData {
   user: {
@@ -50,7 +51,7 @@ export const handler: Handlers<AddData> = {
         });
       }
 
-      const parsed = parseMicrosoftAuthURL(url);
+      const parsed = parseAuthenticatorURL(url);
       if (!parsed) {
         return ctx.render({
           user: { id: session.userId, username: session.username },
@@ -177,11 +178,43 @@ export default function Add({ data }: PageProps<AddData>) {
                 选择添加方式
               </h3>
 
-              {/* URL 方式 */}
+              {/* 二维码方式 */}
               <div class="mb-8">
-                <h4 class="text-md font-medium text-gray-900 mb-2">方式一：通过 URL 添加</h4>
+                <h4 class="text-md font-medium text-gray-900 mb-2">方式一：二维码识别</h4>
                 <p class="text-sm text-gray-600 mb-4">
-                  粘贴从 Microsoft Authenticator 或其他应用获取的 otpauth:// URL
+                  上传二维码图片或从剪切板粘贴，自动识别认证器信息
+                </p>
+
+                <QRCodeUploader
+                  onParsed={(data) => {
+                    // 自动填充表单
+                    const form = document.getElementById('qr-form') as HTMLFormElement;
+                    if (form) {
+                      (form.querySelector('[name="name"]') as HTMLInputElement).value = data.issuer || data.accountName || '未知认证器';
+                      (form.querySelector('[name="secret"]') as HTMLInputElement).value = data.secret;
+                      (form.querySelector('[name="issuer"]') as HTMLInputElement).value = data.issuer;
+                      (form.querySelector('[name="accountName"]') as HTMLInputElement).value = data.accountName;
+                    }
+                  }}
+                  onError={(error) => {
+                    alert('解析失败: ' + error);
+                  }}
+                />
+
+                {/* 隐藏的表单用于提交解析结果 */}
+                <form id="qr-form" method="POST" class="hidden">
+                  <input type="hidden" name="method" value="manual" />
+                  <input type="hidden" name="name" />
+                  <input type="hidden" name="secret" />
+                  <input type="hidden" name="issuer" />
+                  <input type="hidden" name="accountName" />
+                </form>
+              </div>
+
+              <div class="border-t border-gray-200 pt-8 mb-8">
+                <h4 class="text-md font-medium text-gray-900 mb-2">方式二：通过 URL 添加</h4>
+                <p class="text-sm text-gray-600 mb-4">
+                  粘贴从 Microsoft Authenticator 或其他应用获取的认证器 URL
                 </p>
 
                 <form method="POST" class="space-y-4">
@@ -214,7 +247,7 @@ export default function Add({ data }: PageProps<AddData>) {
                       placeholder="otpauth://totp/..."
                     ></textarea>
                     <p class="mt-1 text-xs text-gray-500">
-                      URL 格式：otpauth://totp/账户?secret=密钥&issuer=发行者
+                      支持格式：otpauth://totp/... 或 phonefactor://activate_account?...
                     </p>
                   </div>
 
@@ -228,7 +261,7 @@ export default function Add({ data }: PageProps<AddData>) {
               </div>
 
               <div class="border-t border-gray-200 pt-8">
-                <h4 class="text-md font-medium text-gray-900 mb-2">方式二：手动添加</h4>
+                <h4 class="text-md font-medium text-gray-900 mb-2">方式三：手动添加</h4>
                 <p class="text-sm text-gray-600 mb-4">
                   手动输入认证器的详细信息
                 </p>
