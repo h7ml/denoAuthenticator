@@ -7,6 +7,7 @@
     "start": "deno run -A --watch=static/,routes/ dev.ts",
     "build": "deno run -A --quiet dev.ts build",
     "build:fast": "deno run -A --quiet --no-check dev.ts build",
+    "build:simple": "deno run -A build.ts",
     "preview": "deno run -A main.ts",
     "deploy": "deno run -A main.ts",
     "cache": "deno cache --quiet main.ts",
