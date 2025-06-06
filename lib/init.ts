@@ -12,5 +12,5 @@ export async function initApp() {
   await initDatabase();
 
   console.log("✅ 应用初始化完成");
-  console.log("📁 数据库: Deno KV");
+  console.log("📁 数据库: 内存存储");
 }

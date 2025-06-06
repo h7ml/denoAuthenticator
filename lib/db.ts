@@ -1,6 +1,6 @@
 /**
  * 数据库操作模块
- * 使用 Deno KV 存储用户数据和认证器条目
+ * 使用内存存储用户数据和认证器条目（生产环境应使用真实数据库）
  */
 
 export interface User {
@@ -23,38 +23,32 @@ export interface AuthenticatorEntry {
   updated_at: string;
 }
 
-let kv: Deno.Kv | null = null;
+// 内存存储
+const users = new Map<string, User>();
+const usersByUsername = new Map<string, string>();
+const authenticatorEntries = new Map<string, AuthenticatorEntry>();
+const userEntries = new Map<string, Map<string, AuthenticatorEntry>>();
 
 /**
  * 初始化数据库连接
  */
-export async function initDatabase(): Promise<Deno.Kv> {
-  if (kv) {
-    return kv;
-  }
-
-  kv = await Deno.openKv();
-  return kv;
+export async function initDatabase(): Promise<void> {
+  // 内存数据库不需要初始化
+  console.log("✅ 内存数据库初始化完成");
 }
 
 /**
  * 获取数据库实例
  */
-export async function getDatabase(): Promise<Deno.Kv> {
-  if (!kv) {
-    return await initDatabase();
-  }
-  return kv;
+export async function getDatabase(): Promise<void> {
+  // 内存数据库不需要实例
 }
 
 /**
  * 关闭数据库连接
  */
 export function closeDatabase(): void {
-  if (kv) {
-    kv.close();
-    kv = null;
-  }
+  // 内存数据库不需要关闭
 }
 
 /**
@@ -68,17 +62,14 @@ function generateId(): string {
  * 用户相关操作
  */
 export class UserService {
-  private kv: Promise<Deno.Kv>;
-
   constructor() {
-    this.kv = getDatabase();
+    // 内存存储不需要初始化
   }
 
   /**
    * 创建用户
    */
   async createUser(username: string, passwordHash: string): Promise<string> {
-    const db = await this.kv;
     const id = generateId();
     const user: User = {
       id,
@@ -87,8 +78,8 @@ export class UserService {
       created_at: new Date().toISOString(),
     };
 
-    await db.set(["users", id], user);
-    await db.set(["users_by_username", username], id);
+    users.set(id, user);
+    usersByUsername.set(username, id);
 
     return id;
   }
@@ -97,35 +88,28 @@ export class UserService {
    * 根据用户名获取用户
    */
   async getUserByUsername(username: string): Promise<User | null> {
-    const db = await this.kv;
-
     // 先通过用户名获取用户 ID
-    const userIdResult = await db.get<string>(["users_by_username", username]);
-    if (!userIdResult.value) {
+    const userId = usersByUsername.get(username);
+    if (!userId) {
       return null;
     }
 
     // 再通过 ID 获取用户信息
-    const userResult = await db.get<User>(["users", userIdResult.value]);
-    return userResult.value;
+    return users.get(userId) || null;
   }
 
   /**
    * 根据 ID 获取用户
    */
   async getUserById(id: string): Promise<User | null> {
-    const db = await this.kv;
-    const result = await db.get<User>(["users", id]);
-    return result.value;
+    return users.get(id) || null;
   }
 
   /**
    * 检查用户名是否存在
    */
   async usernameExists(username: string): Promise<boolean> {
-    const db = await this.kv;
-    const result = await db.get(["users_by_username", username]);
-    return result.value !== null;
+    return usersByUsername.has(username);
   }
 }
 
@@ -133,10 +117,8 @@ export class UserService {
  * 认证器条目相关操作
  */
 export class AuthenticatorService {
-  private kv: Promise<Deno.Kv>;
-
   constructor() {
-    this.kv = getDatabase();
+    // 内存存储不需要初始化
   }
 
   /**
@@ -151,7 +133,6 @@ export class AuthenticatorService {
     digits: number = 6,
     timeStep: number = 30
   ): Promise<string> {
-    const db = await this.kv;
     const id = generateId();
     const now = new Date().toISOString();
 
@@ -168,8 +149,12 @@ export class AuthenticatorService {
       updated_at: now,
     };
 
-    await db.set(["authenticator_entries", id], entry);
-    await db.set(["user_entries", userId, id], entry);
+    authenticatorEntries.set(id, entry);
+
+    if (!userEntries.has(userId)) {
+      userEntries.set(userId, new Map());
+    }
+    userEntries.get(userId)!.set(id, entry);
 
     return id;
   }
@@ -178,12 +163,12 @@ export class AuthenticatorService {
    * 获取用户的所有认证器条目
    */
   async getUserEntries(userId: string): Promise<AuthenticatorEntry[]> {
-    const db = await this.kv;
-    const entries: AuthenticatorEntry[] = [];
-
-    for await (const entry of db.list<AuthenticatorEntry>({ prefix: ["user_entries", userId] })) {
-      entries.push(entry.value);
+    const userEntriesMap = userEntries.get(userId);
+    if (!userEntriesMap) {
+      return [];
     }
+
+    const entries = Array.from(userEntriesMap.values());
 
     // 按创建时间倒序排列
     return entries.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -193,9 +178,11 @@ export class AuthenticatorService {
    * 根据 ID 获取认证器条目
    */
   async getEntryById(id: string, userId: string): Promise<AuthenticatorEntry | null> {
-    const db = await this.kv;
-    const result = await db.get<AuthenticatorEntry>(["user_entries", userId, id]);
-    return result.value;
+    const userEntriesMap = userEntries.get(userId);
+    if (!userEntriesMap) {
+      return null;
+    }
+    return userEntriesMap.get(id) || null;
   }
 
   /**
@@ -208,7 +195,6 @@ export class AuthenticatorService {
     issuer: string = "",
     accountName: string = ""
   ): Promise<boolean> {
-    const db = await this.kv;
     const existing = await this.getEntryById(id, userId);
 
     if (!existing) {
@@ -223,8 +209,8 @@ export class AuthenticatorService {
       updated_at: new Date().toISOString(),
     };
 
-    await db.set(["authenticator_entries", id], updated);
-    await db.set(["user_entries", userId, id], updated);
+    authenticatorEntries.set(id, updated);
+    userEntries.get(userId)!.set(id, updated);
 
     return true;
   }
@@ -233,15 +219,17 @@ export class AuthenticatorService {
    * 删除认证器条目
    */
   async deleteEntry(id: string, userId: string): Promise<boolean> {
-    const db = await this.kv;
     const existing = await this.getEntryById(id, userId);
 
     if (!existing) {
       return false;
     }
 
-    await db.delete(["authenticator_entries", id]);
-    await db.delete(["user_entries", userId, id]);
+    authenticatorEntries.delete(id);
+    const userEntriesMap = userEntries.get(userId);
+    if (userEntriesMap) {
+      userEntriesMap.delete(id);
+    }
 
     return true;
   }
