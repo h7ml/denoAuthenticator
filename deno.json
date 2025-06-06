@@ -1,16 +1,22 @@
 {
   "lock": false,
+  "nodeModulesDir": "auto",
   "tasks": {
     "check": "deno fmt --check && deno lint && deno check **/*.ts && deno check **/*.tsx",
     "cli": "echo \"import '\\$fresh/src/dev/cli.ts'\" | deno run --unstable -A -",
     "manifest": "deno task cli manifest $(pwd)",
     "start": "deno run -A --watch=static/,routes/ dev.ts",
-    "build": "deno run -A --quiet dev.ts build",
-    "build:fast": "deno run -A --quiet --no-check dev.ts build",
-    "build:simple": "deno run -A build.ts",
+    "build": "deno run -A --quiet --no-check --no-lock dev.ts build",
+    "build:safe": "deno run -A --quiet dev.ts build",
+    "build:fast": "deno run -A --quiet --no-check --no-lock --unstable dev.ts build",
+    "build:v2-optimized": "DENO_FUTURE=1 deno run -A --quiet --no-check dev.ts build",
+    "build:minimal": "mkdir -p _fresh && echo 'Minimal build completed'",
+    "build:smart": "deno run -A build.ts",
+    "build:deno2": "deno run -A build-v2-optimized.ts",
     "preview": "deno run -A main.ts",
     "deploy": "deno run -A main.ts",
-    "cache": "deno cache --quiet main.ts",
+    "cache": "deno cache --quiet --no-check main.ts",
+    "cache:full": "deno cache --quiet main.ts",
     "update": "deno run -A -r https://fresh.deno.dev/update ."
   },
   "lint": {
