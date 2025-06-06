@@ -143,7 +143,7 @@ export async function registerUser(username: string, email: string, password: st
   }
 
   // 检查用户名是否已存在
-  if (userService.usernameExists(username)) {
+  if (await userService.usernameExists(username)) {
     return {
       success: false,
       message: "用户名已存在",
@@ -151,7 +151,7 @@ export async function registerUser(username: string, email: string, password: st
   }
 
   // 检查邮箱是否已存在
-  if (userService.emailExists(email)) {
+  if (await userService.emailExists(email)) {
     return {
       success: false,
       message: "邮箱已被使用",
@@ -171,7 +171,7 @@ export async function registerUser(username: string, email: string, password: st
     const passwordHash = await hashPassword(password);
 
     // 创建用户
-    const userId = userService.createUser(username, email, passwordHash);
+    const userId = await userService.createUser(username, email, passwordHash);
 
     return {
       success: true,
@@ -199,7 +199,7 @@ export async function loginUser(username: string, password: string): Promise<{
 
   try {
     // 获取用户
-    const user = userService.getUserByUsername(username);
+    const user = await userService.getUserByUsername(username);
     if (!user) {
       return {
         success: false,
@@ -263,7 +263,7 @@ export async function resetPassword(username: string, email: string, newPassword
 
   try {
     // 验证用户名和邮箱是否匹配
-    const user = userService.getUserByUsernameAndEmail(username, email);
+    const user = await userService.getUserByUsernameAndEmail(username, email);
     if (!user) {
       return {
         success: false,
@@ -275,7 +275,7 @@ export async function resetPassword(username: string, email: string, newPassword
     const newPasswordHash = await hashPassword(newPassword);
 
     // 更新密码
-    const updated = userService.updatePassword(username, email, newPasswordHash);
+    const updated = await userService.updatePassword(username, email, newPasswordHash);
     if (!updated) {
       return {
         success: false,
