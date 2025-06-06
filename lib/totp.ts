@@ -172,7 +172,7 @@ export function parsePhoneFactorURL(url: string): {
     const urlParts = decodedUrl.split("/");
     const secret = urlParts[urlParts.length - 1];
 
-    if (!secret) {
+    if (!secret || secret.length < 10) {
       return null;
     }
 

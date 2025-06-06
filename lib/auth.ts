@@ -26,20 +26,22 @@ export interface Session {
 const sessions = new Map<string, Session>();
 
 /**
- * 密码哈希 - 使用 MD5
+ * 密码哈希 - 使用简化的哈希算法（模拟 MD5 格式）
  */
 export async function hashPassword(password: string): Promise<string> {
+  // 使用 SHA-256 但截取前32位模拟 MD5 长度
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
-
-  // 使用 MD5 哈希
-  const hashBuffer = await crypto.subtle.digest("MD5", data);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   const hashArray = new Uint8Array(hashBuffer);
 
-  // 转换为十六进制字符串
-  return Array.from(hashArray)
+  // 转换为十六进制字符串，截取前32位（MD5 长度）
+  const hex = Array.from(hashArray)
     .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+    .join('')
+    .substring(0, 32); // MD5 是32位十六进制
+
+  return hex;
 }
 
 /**
@@ -47,7 +49,7 @@ export async function hashPassword(password: string): Promise<string> {
  */
 export async function verifyPassword(password: string, hashValue: string): Promise<boolean> {
   try {
-    // 计算输入密码的 MD5 哈希
+    // 计算输入密码的哈希
     const computedHash = await hashPassword(password);
 
     // 直接比较哈希值

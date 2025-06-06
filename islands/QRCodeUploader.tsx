@@ -60,7 +60,7 @@ export default function QRCodeUploader({ onParsed, onError }: QRCodeUploaderProp
       console.log("客户端解析失败，尝试服务端解析...");
       const serverResult = await parseQRCodeWithServer(file);
       if (serverResult) {
-        console.log("服务端解析成功");
+        console.log("服务端解析成功，数据:", serverResult);
         setProcessingStatus("解析成功！");
         safeOnParsed(serverResult);
         return;
@@ -68,7 +68,8 @@ export default function QRCodeUploader({ onParsed, onError }: QRCodeUploaderProp
 
       // 所有方法都失败了
       setProcessingStatus("解析失败");
-      safeOnError("无法识别二维码。请确保：\n1. 图片清晰且包含完整的二维码\n2. 二维码包含有效的认证器信息\n3. 网络连接正常");
+      console.log("所有解析方法都失败了");
+      safeOnError("无法识别二维码。请尝试：\n1. 确保图片清晰且包含完整的二维码\n2. 手动输入认证器信息");
     } catch (error) {
       setProcessingStatus("处理出错");
       safeOnError("处理图片时出错: " + (error as Error).message);
@@ -100,15 +101,21 @@ export default function QRCodeUploader({ onParsed, onError }: QRCodeUploaderProp
         body: formData
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          return result.data;
-        }
+      const result = await response.json();
+      console.log("服务端响应:", response.status, result);
+
+      if (response.ok && result.success) {
+        console.log("服务端解析成功，返回数据:", result.data);
+        return result.data;
+      } else {
+        // 显示服务端返回的具体错误信息
+        console.error("服务端解析失败:", result.error);
+        safeOnError("服务端解析失败：" + (result.error || "未知错误"));
+        return null;
       }
-      return null;
     } catch (error) {
-      console.error("服务端解析失败:", error);
+      console.error("服务端请求失败:", error);
+      safeOnError("服务端请求失败，请检查网络连接");
       return null;
     }
   };
