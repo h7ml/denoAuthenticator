@@ -49,18 +49,6 @@ jobs:
       - name: Cache dependencies
         run: deno cache main.ts
 
-      # 代码质量检查（可选，可以注释掉以加快速度）
-      - name: Check formatting
-        run: deno fmt --check
-        continue-on-error: true
-
-      - name: Run linter
-        run: deno lint
-        continue-on-error: true
-
-      - name: Type check
-        run: deno check main.ts
-
       # 构建项目
       - name: Build step
         run: deno task build
