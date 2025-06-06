@@ -186,29 +186,33 @@ export default function Add({ data }: PageProps<AddData>) {
                 </p>
 
                 <QRCodeUploader
-                  onParsed={(data) => {
-                    // 自动填充表单
-                    const form = document.getElementById('qr-form') as HTMLFormElement;
-                    if (form) {
-                      (form.querySelector('[name="name"]') as HTMLInputElement).value = data.issuer || data.accountName || '未知认证器';
-                      (form.querySelector('[name="secret"]') as HTMLInputElement).value = data.secret;
-                      (form.querySelector('[name="issuer"]') as HTMLInputElement).value = data.issuer;
-                      (form.querySelector('[name="accountName"]') as HTMLInputElement).value = data.accountName;
+                  onParsed={(data: { secret: string; issuer: string; accountName: string }) => {
+                    try {
+                      // 自动填充手动添加表单
+                      const nameInput = document.getElementById('manual-name') as HTMLInputElement;
+                      const secretInput = document.getElementById('secret') as HTMLInputElement;
+                      const issuerInput = document.getElementById('issuer') as HTMLInputElement;
+                      const accountNameInput = document.getElementById('accountName') as HTMLInputElement;
+
+                      if (nameInput) nameInput.value = data.issuer || data.accountName || '未知认证器';
+                      if (secretInput) secretInput.value = data.secret;
+                      if (issuerInput) issuerInput.value = data.issuer || '';
+                      if (accountNameInput) accountNameInput.value = data.accountName || '';
+
+                      // 滚动到手动添加表单
+                      document.getElementById('manual-form')?.scrollIntoView({ behavior: 'smooth' });
+
+                      // 显示成功提示
+                      alert('二维码解析成功！信息已自动填入下方表单，请检查后提交。');
+                    } catch (error) {
+                      console.error('填充表单时出错:', error);
+                      alert('解析成功，但填充表单时出错，请手动填写。');
                     }
                   }}
-                  onError={(error) => {
+                  onError={(error: string) => {
                     alert('解析失败: ' + error);
                   }}
                 />
-
-                {/* 隐藏的表单用于提交解析结果 */}
-                <form id="qr-form" method="POST" class="hidden">
-                  <input type="hidden" name="method" value="manual" />
-                  <input type="hidden" name="name" />
-                  <input type="hidden" name="secret" />
-                  <input type="hidden" name="issuer" />
-                  <input type="hidden" name="accountName" />
-                </form>
               </div>
 
               <div class="border-t border-gray-200 pt-8 mb-8">
@@ -266,7 +270,7 @@ export default function Add({ data }: PageProps<AddData>) {
                   手动输入认证器的详细信息
                 </p>
 
-                <form method="POST" class="space-y-4">
+                <form id="manual-form" method="POST" class="space-y-4">
                   <input type="hidden" name="method" value="manual" />
 
                   <div>

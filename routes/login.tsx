@@ -105,9 +105,16 @@ export default function Login({ data }: PageProps<LoginData>) {
             </div>
 
             <div>
-              <label htmlFor="password" class="block text-sm font-medium text-gray-700">
-                密码
-              </label>
+              <div class="flex items-center justify-between">
+                <label htmlFor="password" class="block text-sm font-medium text-gray-700">
+                  密码
+                </label>
+                <div class="text-sm">
+                  <a href="/reset-password" class="font-medium text-blue-600 hover:text-blue-500">
+                    忘记密码？
+                  </a>
+                </div>
+              </div>
               <div class="mt-1">
                 <input
                   id="password"
@@ -129,9 +136,23 @@ export default function Login({ data }: PageProps<LoginData>) {
                 登录
               </button>
             </div>
+
+            {/* 登录问题提示 */}
+            <div class="mt-4 text-center">
+              <p class="text-sm text-gray-600">
+                登录遇到问题？
+                <a href="/reset-password" class="font-medium text-red-600 hover:text-red-500 ml-1">
+                  重置密码
+                </a>
+                或
+                <a href="/register" class="font-medium text-blue-600 hover:text-blue-500 ml-1">
+                  注册新账户
+                </a>
+              </p>
+            </div>
           </form>
 
-          <div class="mt-6">
+          <div class="mt-8">
             <div class="relative">
               <div class="absolute inset-0 flex items-center">
                 <div class="w-full border-t border-gray-300" />
@@ -141,13 +162,7 @@ export default function Login({ data }: PageProps<LoginData>) {
               </div>
             </div>
 
-            <div class="mt-6 grid grid-cols-2 gap-3">
-              <a
-                href="/reset-password"
-                class="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-              >
-                重置密码
-              </a>
+            <div class="mt-6">
               <a
                 href="/"
                 class="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
