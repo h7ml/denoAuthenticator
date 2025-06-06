@@ -4,7 +4,10 @@
 /// <reference lib="dom.asynciterable" />
 /// <reference lib="deno.ns" />
 
-import "$std/dotenv/load.ts";
+import { load } from "$std/dotenv/mod.ts";
+
+// 加载环境变量，允许空值
+await load({ allowEmptyValues: true });
 
 import { start } from "$fresh/server.ts";
 import manifest from "./fresh.gen.ts";
