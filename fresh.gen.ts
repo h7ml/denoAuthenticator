@@ -7,6 +7,7 @@ import * as $_app from "./routes/_app.tsx";
 import * as $add from "./routes/add.tsx";
 import * as $api_authenticators_id_ from "./routes/api/authenticators/[id].ts";
 import * as $api_joke from "./routes/api/joke.ts";
+import * as $api_parse_qr_image from "./routes/api/parse-qr-image.ts";
 import * as $api_parse_qr from "./routes/api/parse-qr.ts";
 import * as $dashboard from "./routes/dashboard.tsx";
 import * as $greet_name_ from "./routes/greet/[name].tsx";
@@ -27,6 +28,7 @@ const manifest = {
     "./routes/add.tsx": $add,
     "./routes/api/authenticators/[id].ts": $api_authenticators_id_,
     "./routes/api/joke.ts": $api_joke,
+    "./routes/api/parse-qr-image.ts": $api_parse_qr_image,
     "./routes/api/parse-qr.ts": $api_parse_qr,
     "./routes/dashboard.tsx": $dashboard,
     "./routes/greet/[name].tsx": $greet_name_,

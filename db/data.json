@@ -1,0 +1,29 @@
+{
+  "users": [
+    [
+      "cb632169-1f0d-4623-be84-f391a6bfb779",
+      {
+        "id": "cb632169-1f0d-4623-be84-f391a6bfb779",
+        "username": "h7ml",
+        "email": "h7ml@qq.com",
+        "password_hash": "Zm3drApMJ34NvhjfS+unUEpEzPEL3cL7Tt0xBGOyA0+bBX3s1eJ+omyB9pW6U6U4",
+        "created_at": "2025-06-06T09:10:36.685Z",
+        "updated_at": "2025-06-06T09:10:36.685Z"
+      }
+    ]
+  ],
+  "usersByUsername": [
+    [
+      "h7ml",
+      "cb632169-1f0d-4623-be84-f391a6bfb779"
+    ]
+  ],
+  "usersByEmail": [
+    [
+      "h7ml@qq.com",
+      "cb632169-1f0d-4623-be84-f391a6bfb779"
+    ]
+  ],
+  "authenticatorEntries": [],
+  "userEntries": []
+}

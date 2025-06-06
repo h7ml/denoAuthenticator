@@ -9,41 +9,112 @@ interface QRCodeUploaderProps {
 export default function QRCodeUploader({ onParsed, onError }: QRCodeUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 处理文件选择
+  // 安全的错误处理函数
+  const safeOnError = (message: string) => {
+    console.error('QRCodeUploader Error:', message);
+    if (typeof onError === 'function') {
+      onError(message);
+    } else {
+      alert('错误: ' + message);
+    }
+  };
+
+  // 安全的成功处理函数
+  const safeOnParsed = (data: { secret: string; issuer: string; accountName: string }) => {
+    console.log('QRCodeUploader Success:', data);
+    if (typeof onParsed === 'function') {
+      onParsed(data);
+    } else {
+      alert('解析成功，但无法处理结果');
+    }
+  };
+
+  // 处理文件选择 - 多层兜底解析
   const handleFileSelect = async (file: File) => {
     if (!file.type.startsWith("image/")) {
-      onError("请选择图片文件");
+      safeOnError("请选择图片文件");
       return;
     }
 
     setIsProcessing(true);
     try {
-      // 由于我们需要在客户端处理二维码解析
-      // 这里我们使用动态导入来加载 jsQR
-      const jsQR = await import("https://esm.sh/jsqr@1.4.0");
-
-      const result = await parseQRCodeFromFile(file, jsQR.default);
-      if (result) {
-        const parsed = parseAuthenticatorURL(result);
+      // 第一层：客户端 jsQR 解析
+      setProcessingStatus("正在使用客户端解析...");
+      console.log("尝试客户端解析...");
+      const clientResult = await parseQRCodeWithClient(file);
+      if (clientResult) {
+        const parsed = parseAuthenticatorURL(clientResult);
         if (parsed) {
-          onParsed(parsed);
-        } else {
-          onError("二维码中没有找到有效的认证器信息");
+          console.log("客户端解析成功");
+          setProcessingStatus("解析成功！");
+          safeOnParsed(parsed);
+          return;
         }
-      } else {
-        onError("无法识别二维码，请确保图片清晰且包含有效的二维码");
       }
+
+      // 第二层：服务端 API 解析（包含第三方 API）
+      setProcessingStatus("正在使用服务端解析...");
+      console.log("客户端解析失败，尝试服务端解析...");
+      const serverResult = await parseQRCodeWithServer(file);
+      if (serverResult) {
+        console.log("服务端解析成功");
+        setProcessingStatus("解析成功！");
+        safeOnParsed(serverResult);
+        return;
+      }
+
+      // 所有方法都失败了
+      setProcessingStatus("解析失败");
+      safeOnError("无法识别二维码。请确保：\n1. 图片清晰且包含完整的二维码\n2. 二维码包含有效的认证器信息\n3. 网络连接正常");
     } catch (error) {
-      onError("处理图片时出错: " + (error as Error).message);
+      setProcessingStatus("处理出错");
+      safeOnError("处理图片时出错: " + (error as Error).message);
     } finally {
       setIsProcessing(false);
+      setTimeout(() => setProcessingStatus(""), 2000); // 2秒后清除状态
+    }
+  };
+
+  // 客户端解析方法
+  const parseQRCodeWithClient = async (file: File): Promise<string | null> => {
+    try {
+      const jsQR = await import("https://esm.sh/jsqr@1.4.0");
+      return await parseQRCodeFromFile(file, jsQR.default);
+    } catch (error) {
+      console.error("客户端解析失败:", error);
+      return null;
+    }
+  };
+
+  // 服务端解析方法
+  const parseQRCodeWithServer = async (file: File): Promise<{ secret: string; issuer: string; accountName: string } | null> => {
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const response = await fetch("/api/parse-qr-image", {
+        method: "POST",
+        body: formData
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          return result.data;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("服务端解析失败:", error);
+      return null;
     }
   };
 
   // 解析二维码从文件
-  const parseQRCodeFromFile = (file: File, jsQR: any): Promise<string | null> => {
+  const parseQRCodeFromFile = (file: File, jsQR: (data: Uint8ClampedArray, width: number, height: number) => { data: string } | null): Promise<string | null> => {
     return new Promise((resolve) => {
       const img = new Image();
       const canvas = document.createElement("canvas");
@@ -131,18 +202,18 @@ export default function QRCodeUploader({ onParsed, onError }: QRCodeUploaderProp
           const text = await navigator.clipboard.readText();
           const parsed = parseAuthenticatorURL(text.trim());
           if (parsed) {
-            onParsed(parsed);
+            safeOnParsed(parsed);
             return;
           } else {
-            onError("剪切板中的文本不是有效的认证器 URL");
+            safeOnError("剪切板中的文本不是有效的认证器 URL");
             return;
           }
         }
       }
 
-      onError("剪切板中没有找到图片或认证器 URL");
+      safeOnError("剪切板中没有找到图片或认证器 URL");
     } catch (_error) {
-      onError("读取剪切板失败，请确保已授权访问剪切板");
+      safeOnError("读取剪切板失败，请确保已授权访问剪切板");
     }
   };
 
@@ -182,7 +253,7 @@ export default function QRCodeUploader({ onParsed, onError }: QRCodeUploaderProp
             onClick={() => fileInputRef.current?.click()}
             disabled={isProcessing}
           >
-            {isProcessing ? "处理中..." : "选择图片文件"}
+            {isProcessing ? (processingStatus || "处理中...") : "选择图片文件"}
           </button>
         </div>
       </div>
@@ -215,6 +286,7 @@ export default function QRCodeUploader({ onParsed, onError }: QRCodeUploaderProp
       <div class="text-xs text-gray-500 text-center">
         <p>支持的格式：JPG, PNG, GIF, BMP, WebP</p>
         <p>支持的 URL 格式：otpauth://, phonefactor://</p>
+        <p class="mt-1 text-blue-600">🛡️ 多层解析保障：客户端 + 服务端 + 第三方 API</p>
       </div>
     </div>
   );
