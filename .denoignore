@@ -1,0 +1,25 @@
+# 忽略不必要的文件以加速构建
+*.md
+.git/
+.github/
+node_modules/
+.vscode/
+.idea/
+*.log
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.temp
+.cache/
+
+# 测试文件
+*test*
+*spec*
+
+# 文档
+docs/
+README*
+LICENSE
+CHANGELOG*

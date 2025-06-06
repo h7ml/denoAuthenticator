@@ -5,9 +5,11 @@
     "cli": "echo \"import '\\$fresh/src/dev/cli.ts'\" | deno run --unstable -A -",
     "manifest": "deno task cli manifest $(pwd)",
     "start": "deno run -A --watch=static/,routes/ dev.ts",
-    "build": "deno run -A dev.ts build",
+    "build": "deno run -A --quiet dev.ts build",
+    "build:fast": "deno run -A --quiet --no-check dev.ts build",
     "preview": "deno run -A main.ts",
     "deploy": "deno run -A main.ts",
+    "cache": "deno cache --quiet main.ts",
     "update": "deno run -A -r https://fresh.deno.dev/update ."
   },
   "lint": {

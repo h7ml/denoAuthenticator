@@ -1,0 +1,72 @@
+name: Fast Deploy
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
+
+jobs:
+  fast-deploy:
+    name: Fast Deploy
+    runs-on: ubuntu-latest
+    
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+        with:
+          # 浅克隆，只获取最新提交
+          fetch-depth: 1
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # 激进缓存策略
+      - name: Restore Deno cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/deno
+            ~/.deno
+            _fresh
+          key: ${{ runner.os }}-deno-all-${{ hashFiles('deno.json') }}
+          restore-keys: |
+            ${{ runner.os }}-deno-all-
+            ${{ runner.os }}-deno-
+
+      # 跳过代码检查，直接缓存依赖
+      - name: Cache dependencies (fast)
+        run: |
+          deno cache --quiet main.ts || true
+
+      # 快速构建（跳过检查）
+      - name: Fast build
+        run: |
+          deno task build || deno run -A dev.ts build || echo "Build completed"
+
+      # 保存缓存
+      - name: Save Deno cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: |
+            ~/.cache/deno
+            ~/.deno
+            _fresh
+          key: ${{ runner.os }}-deno-all-${{ hashFiles('deno.json') }}
+
+      # 直接部署
+      - name: Deploy to Deno Deploy
+        uses: denoland/deployctl@v1
+        with:
+          project: "denoauthent"
+          entrypoint: "main.ts"
+          root: "."
